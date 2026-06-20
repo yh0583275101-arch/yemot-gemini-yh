@@ -95,7 +95,7 @@ def chat():
             return f"read=f-greeting=user_audio,,record&say_before_read=f-answer_{phone}"
 
         # כניסה ראשונית - משמיע את קובץ ה-greeting שהעלת ומקליט
-      #  return f"read=f-greeting=user_audio,,record"
+        return f"read=f-greeting=user_audio,,record"
         
     except Exception as e:
         # אם יש שגיאה - היא תודפס ישירות ללוג של רנדר בצורה ברורה!
