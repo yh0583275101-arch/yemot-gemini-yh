@@ -50,10 +50,10 @@ def set_model():
     
     # מיפוי המודלים (Google מספקת כרגע את 1.5 בתור המודלים החזקים ביותר, מיפינו לפי בקשתך)
     if model_choice == '1':
-        session['model'] = 'gemini-1.5-flash' # Gemini 2.5 Flash / Standard Flash
+        session['model'] = 'gemini-3.5-flash' # Gemini 2.5 Flash / Standard Flash
     elif model_choice == '2':
-        session['model'] = 'gemini-1.5-flash-8b' # המודל הקל והמהיר ביותר (Lite)
+        session['model'] = 'gemini-3.1-flash-lite' # המודל הקל והמהיר ביותר (Lite)
     elif model_choice == '3':
-        session['model'] = 'gemini-1.5-pro' # מודל ה-Pro החזק ביותר
+        session['model'] = 'gemini-2.5-flash' # מודל ה-Pro החזק ביותר
         
     return "id_list_message=f-model_updated&go_to_folder=/"
