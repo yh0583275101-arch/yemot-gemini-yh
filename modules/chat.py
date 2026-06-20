@@ -45,7 +45,7 @@ def chat():
 
         if user_audio:
             print("מזהה הקלטה חדשה, מתחיל הורדה מימות המשיח...")
-            download_url = f"https://www.call2all.co.il/ym/api/DownloadFile?token={yemot_num}:{yemot_pass}&path=ivr2:/{user_audio}"
+            download_url = f"https://www.call2all.co.il/ym/api/DownloadFile?token={yemot_num}:{yemot_pass}&path=ivr2:{user_audio}"
             
             # ניסיון הורדה בטוח
             res = requests.get(download_url)
