@@ -92,7 +92,7 @@ def chat():
             if os.path.exists(local_audio_path): os.remove(local_audio_path)
             if os.path.exists(tts_filename): os.remove(tts_filename)
 
-            return f"id_list_message=f-answer_{phone}&read=f-next_step_menu=next_step,,1,1,Digits"
+            return f"id_list_message=f-answer_{phone}&read=f-greeting=user_audio,,record"
 
         # כניסה ראשונית - משמיע את קובץ ה-greeting שהעלת ומקליט
         return f"read=f-greeting=user_audio,,record"
