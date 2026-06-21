@@ -84,6 +84,7 @@ def chat():
         
         user_audio = args.get('user_audio')
         next_step = args.get('next_step')
+        check_status = args.get('check_status')
         
         print(f"--- פנייה חדשה מטלפון {phone} ---")
         print(f"user_audio: {user_audio}, next_step: {next_step}")
