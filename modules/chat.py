@@ -112,8 +112,7 @@ def chat():
             t = threading.Thread(target=background_processing, args=(phone, yemot_num, yemot_pass, user_audio, gemini_key))
             t.start()
             
-            return f"read=t-M0000=no_digits,,4,4,Digits&go_to_folder=?check_status=yes"
-
+            return f"id_list_message=t-M0000&go_to_folder=?check_status=yes"
         # if user_audio:
         #     print("מזהה הקלטה חדשה, מתחיל הורדה מימות המשיח...")
         #     download_url = f"https://www.call2all.co.il/ym/api/DownloadFile?token={yemot_num}:{yemot_pass}&path=ivr2:{user_audio}"
