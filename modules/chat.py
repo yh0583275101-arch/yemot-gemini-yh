@@ -30,6 +30,11 @@ def chat():
         yemot_num = args.get('yemot_num')
         yemot_pass = args.get('yemot_pass')
         user_audio = args.get('user_audio')
+
+        # אם המשתמש ניתק את השיחה, נעצור מיד ולא נשלח כלום לשרת
+        if args.get('hangup') == 'yes':
+            print(f"המשתמש {phone} ניתק את השיחה. עוצר פעילות.")
+            return ""
         
         # משיכת מפתח ה-API בצורה שמתאימה גם כשהוא מוגדר בשורה נפרדת בימות המשיח
         gemini_key = args.get('gemini_key')
@@ -89,7 +94,7 @@ def chat():
             if os.path.exists(tts_filename): os.remove(tts_filename)
 
             # הפקודה המדויקת שמשמיעה מתוך שלוחה 1 ומבקשת להקליט שוב
-            return f"read=f-answer_{phone}=user_audio,,record"
+            return f"answer_{phone}"
 
         # כניסה ראשונית לשלוחה
         return f"read=f-greeting=user_audio,,record"
