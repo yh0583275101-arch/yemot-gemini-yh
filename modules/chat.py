@@ -14,7 +14,7 @@ def get_session(phone):
         user_sessions[phone] = {
             'history': [],
             'prompt': 'אתה עוזר חכם ואישי. ענה בצורה קצרה ותמציתית מאוד (עד 2-3 משפטים), בשפה פשוטה וזורמת של חבר אל חבר. אל תשתמש בשום פנים ואופן בכוכביות, סולמיות או סימוני טקסט מיוחדים.',
-            'model': 'gemini-1.5-flash'
+            'model': 'gemini-2.5-flash'
         }
     return user_sessions[phone]
 
