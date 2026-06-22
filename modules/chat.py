@@ -81,7 +81,7 @@ def chat():
             answer_text = response.text
             print(f"תשובת הבינה המלאכותית: {answer_text}")
 
-            tts_filename = f"answer_{phone}.wav"
+            tts_filename = f"{phone}.wav"
             asyncio.run(generate_tts(answer_text, tts_filename))
             print("קובץ ה-TTS נוצר בהצלחה. מעלה חזרה לשלוחה 1...")
 
@@ -90,7 +90,7 @@ def chat():
             with open(tts_filename, 'rb') as f:
                 requests.post(upload_url, data={
                     'token': f"{yemot_num}:{yemot_pass}",
-                    'path': f"ivr2:1/answer_{phone}.wav"
+                    'path': f"ivr2:1/{phone}.wav"
                 }, files={'file': f})
 
             print("הקובץ עלה לימות המשיח בהצלחה!")
