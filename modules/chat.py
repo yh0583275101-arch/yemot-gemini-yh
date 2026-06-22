@@ -13,8 +13,8 @@ def get_session(phone):
     if phone not in user_sessions:
         user_sessions[phone] = {
             'history': [],
-            'prompt': 'אתה עוזר חכם ואישי. ענה בצורה טבעית, שפת דיבור זורמת של חבר אל חבר. אל תשתמש בשום פנים ואופן בכוכביות, סולמיות, אימוג\'ים או סימוני טקסט מיוחדים. השתמש בסימני פיסוק בלבד (פסיק ונקודה) כדי שהקריין שמקריא את הטקסט יוכל לפסק נכון את המשפטים.',
-            'model': 'gemini-3.5-flash'
+            'prompt': 'אתה עוזר חכם ואישי. ענה בצורה קצרה ותמציתית מאוד (עד 2-3 משפטים), בשפה פשוטה וזורמת של חבר אל חבר. אל תשתמש בשום פנים ואופן בכוכביות, סולמיות או סימוני טקסט מיוחדים.',
+            'model': 'gemini-1.5-flash'
         }
     return user_sessions[phone]
 
@@ -26,42 +26,49 @@ async def generate_tts(text, filename):
 def chat():
     try:
         args = request.values
-        phone = args.get('ApiPhone', 'unknown')
+        phone = args.get('ApiPhone')
+        gemini_key = args.get('gemini_key')
         yemot_num = args.get('yemot_num')
         yemot_pass = args.get('yemot_pass')
         user_audio = args.get('user_audio')
-
-        # אם המשתמש ניתק את השיחה, נעצור מיד ולא נשלח כלום לשרת
+        
+        # הגנה מבוססת ניתוק
         if args.get('hangup') == 'yes':
-            print(f"המשתמש {phone} ניתק את השיחה. עוצר פעילות.")
             return ""
-        
-        # משיכת מפתח ה-API בצורה שמתאימה גם כשהוא מוגדר בשורה נפרדת בימות המשיח
-        gemini_key = args.get('gemini_key')
-        
+            
+        if not phone or phone == 'unknown':
+            print("!!! אזהרה: לא התקבל מספר טלפון תקין")
+            return ""
+
         print(f"--- פנייה חדשה מטלפון {phone} ---")
         
+        # מחיקת קובץ התשובה הישן מימות המשיח כדי למנוע כפילויות אם תהיה קריסה
+        if user_audio:
+            print("מוחק את קובץ התשובה הישן מימות המשיח למניעת כפילויות...")
+            delete_url = f"https://www.call2all.co.il/ym/api/DeleteFile?token={yemot_num}:{yemot_pass}&path=ivr2:1/{phone}.wav"
+            requests.get(delete_url)
+
         if not gemini_key:
-            print("!!! שגיאה: מפתח gemini_key לא התקבל בשרת")
-            return f"id_list_message=t-M1103&go_to_folder=/"
+            print("!!! שגיאה: מפתח gemini_key חסר")
+            return "id_list_message=t-M1103"
 
         session = get_session(phone)
         genai.configure(api_key=gemini_key)
 
         if user_audio:
-            print("מזהה הקלטה חדשה, מתחיל הורדה מימות המשיח...")
+            print(f"מתחיל הורדת הקלטה: {user_audio}")
             download_url = f"https://www.call2all.co.il/ym/api/DownloadFile?token={yemot_num}:{yemot_pass}&path=ivr2:{user_audio}"
             
             res = requests.get(download_url)
             if res.status_code != 200:
-                print(f"שגיאה בהורדת הקובץ מימות המשיח: קוד סטטוס {res.status_code}")
-                return f"id_list_message=t-M1103&go_to_folder=/"
+                print("שגיאה בהורדת הקובץ מימות המשיח")
+                return "id_list_message=t-M1103"
                 
             local_audio_path = f"input_{phone}.wav"
             with open(local_audio_path, 'wb') as f:
                 f.write(res.content)
 
-            print("הקובץ נשמר בהצלחה בשרת. מעלה ל-Gemini...")
+            print("הקובץ נשמר בשרת. מעלה ל-Gemini...")
             uploaded_audio = genai.upload_file(local_audio_path)
             
             model = genai.GenerativeModel(
@@ -69,23 +76,30 @@ def chat():
                 system_instruction=session['prompt']
             )
             
+            print("פונה לג'מיני לקבלת תשובה...")
             chat_session = model.start_chat(history=session['history'])
-            response = chat_session.send_message(["אנא ענה על ההקלטה המצורפת", uploaded_audio])
             
-            # בדיקה קריטית: מוודאים שג'מיני אכן החזיר תשובה תקינה ולא ריקה
-            if not response or not hasattr(response, 'text') or not response.text:
-                print("!!! אזהרה: ג'מיני החזיר תשובה ריקה או שנחסם (Quota/Content). שולח הודעת שגיאה למשתמש.")
-                return "id_list_message=t-M1103&go_to_folder=/"
-            
+            try:
+                response = chat_session.send_message(["אנא הקשב לקובץ השמע המצורף וענה עליו בקיצור נמרץ בתור תשובה למשתמש:", uploaded_audio])
+                
+                if not response or not hasattr(response, 'text') or not response.text:
+                    print("!!! ג'מיני החזיר אובייקט ריק או חסום. בדוק הגדרות בטיחות/מכסה.")
+                    return "id_list_message=t-M1103"
+                    
+                answer_text = response.text
+                print(f"תשובת הבינה המלאכותית: {answer_text}")
+                
+            except Exception as gemini_error:
+                # מדפיס ללוג של Render את השגיאה המדויקת של גוגל!
+                print(f"!!! קריסה ישירה בפנייה לגו׳מיני: {str(gemini_error)}")
+                return "id_list_message=t-M1103"
+
             session['history'] = chat_session.history
-            answer_text = response.text
-            print(f"תשובת הבינה המלאכותית: {answer_text}")
 
             tts_filename = f"{phone}.wav"
             asyncio.run(generate_tts(answer_text, tts_filename))
-            print("קובץ ה-TTS נוצר בהצלחה. מעלה חזרה לשלוחה 1...")
+            print("קובץ ה-TTS נוצר. מעלה לשלוחה 1...")
 
-            # העלאה ישירה לתוך שלוחה 1 (ivr2:1/)
             upload_url = f"https://www.call2all.co.il/ym/api/UploadFile"
             with open(tts_filename, 'rb') as f:
                 requests.post(upload_url, data={
@@ -93,17 +107,16 @@ def chat():
                     'path': f"ivr2:1/{phone}.wav"
                 }, files={'file': f})
 
-            print("הקובץ עלה לימות המשיח בהצלחה!")
+            print("הקובץ עלה בהצלחה!")
             
             if os.path.exists(local_audio_path): os.remove(local_audio_path)
             if os.path.exists(tts_filename): os.remove(tts_filename)
 
-            # הפקודה המדויקת שמשמיעה מתוך שלוחה 1 ומבקשת להקליט שוב
             return ""
 
         # כניסה ראשונית לשלוחה
         return f"read=f-greeting=user_audio,,record"
         
     except Exception as e:
-        print(f"!!! קריסה חמורה בפונקציית הצ'אט: {str(e)}")
-        return f"id_list_message=t-M1103&go_to_folder=/"
+        print(f"!!! קריסה כללית בפונקציה: {str(e)}")
+        return "id_list_message=t-M1103"
