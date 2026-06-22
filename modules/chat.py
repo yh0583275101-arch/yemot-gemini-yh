@@ -94,7 +94,7 @@ def chat():
             if os.path.exists(tts_filename): os.remove(tts_filename)
 
             # הפקודה המדויקת שמשמיעה מתוך שלוחה 1 ומבקשת להקליט שוב
-            return f"answer_{phone}"
+            return f"play=answer_{phone}"
 
         # כניסה ראשונית לשלוחה
         return f"read=f-greeting=user_audio,,record"
