@@ -72,6 +72,11 @@ def chat():
             chat_session = model.start_chat(history=session['history'])
             response = chat_session.send_message(["אנא ענה על ההקלטה המצורפת", uploaded_audio])
             
+            # בדיקה קריטית: מוודאים שג'מיני אכן החזיר תשובה תקינה ולא ריקה
+            if not response or not hasattr(response, 'text') or not response.text:
+                print("!!! אזהרה: ג'מיני החזיר תשובה ריקה או שנחסם (Quota/Content). שולח הודעת שגיאה למשתמש.")
+                return "id_list_message=t-M1103&go_to_folder=/"
+            
             session['history'] = chat_session.history
             answer_text = response.text
             print(f"תשובת הבינה המלאכותית: {answer_text}")
