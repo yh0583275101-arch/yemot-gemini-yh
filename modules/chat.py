@@ -112,7 +112,7 @@ def chat():
             if os.path.exists(local_audio_path): os.remove(local_audio_path)
             if os.path.exists(tts_filename): os.remove(tts_filename)
 
-            return f"id_list_message=f-{phone}&read=user_audio,,record"
+            return f"read=f-{phone}=user_audio,,record"
 
         # כניסה ראשונית לשלוחה
         return f"read=f-greeting=user_audio,,record"
@@ -120,3 +120,26 @@ def chat():
     except Exception as e:
         print(f"!!! קריסה כללית בפונקציה: {str(e)}")
         return "id_list_message=t-M1103"
+
+@chat_bp.route('/api/error', methods=['GET', 'POST'])
+def handle_error():
+    args = request.values
+    action = args.get('Action', 'לא ידוע')
+    file_path = args.get('FilePath', 'לא ידוע')
+    error_msg = args.get('ErrorMessage', 'לא ידוע')
+    
+    # תרגום הפעולה לעברית לפי בקשתך
+    action_desc = ""
+    if "id list message" in action.lower():
+        action_desc = " - פקודה של השמעת קבצים"
+    elif "read" in action.lower():
+        action_desc = " - פקודה של השמעת קובץ והקלטה"
+        
+    print("\n=====================================")
+    print(" 🚨 התקבלה שגיאת השמעת קובץ מימות המשיח!")
+    print(f" Action: {action}{action_desc}")
+    print(f" FilePath: {file_path} /// נתיב הקובץ שניסתה המערכת להשמיע")
+    print(f" ErrorMessage: {error_msg} /// סיבת השגיאה")
+    print("=====================================\n")
+    
+    return "OK"
