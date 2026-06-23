@@ -112,7 +112,7 @@ def chat():
             
             # ממתינים 2 שניות כדי לתת לשרתים של ימות המשיח להסתנכרן על הקובץ החדש
             print("ממתין 2 שניות לסנכרון הקובץ בימות המשיח...")
-            time.sleep(5)
+            time.sleep(20)
             
             if os.path.exists(local_audio_path): os.remove(local_audio_path)
             if os.path.exists(tts_filename): os.remove(tts_filename)
