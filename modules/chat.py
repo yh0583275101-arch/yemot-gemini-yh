@@ -117,7 +117,7 @@ def chat():
             if os.path.exists(local_audio_path): os.remove(local_audio_path)
             if os.path.exists(tts_filename): os.remove(tts_filename)
 
-            id_list_message=f-{phone}&
+            return f"id_list_message=f-{phone}&"
 
 
         # כניסה ראשונית לשלוחה
