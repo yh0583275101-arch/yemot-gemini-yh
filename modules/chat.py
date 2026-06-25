@@ -66,7 +66,7 @@ def chat():
                 print("שגיאה בהורדת הקובץ מימות המשיח")
                 return "id_list_message=t-M1103"
                 
-            local_audio_path = f"input_{phone}.wav"
+            local_audio_path = f"/tmp/input_{phone}.wav"
             with open(local_audio_path, 'wb') as f:
                 f.write(res.content)
 
