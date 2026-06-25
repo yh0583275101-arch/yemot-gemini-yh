@@ -6,6 +6,9 @@ import edge_tts
 from flask import Blueprint, request
 import google.generativeai as genai
 import traceback
+import wave
+import audioop
+import minimp3
 
 chat_bp = Blueprint('chat', __name__)
 
