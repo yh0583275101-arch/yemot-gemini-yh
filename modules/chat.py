@@ -23,9 +23,49 @@ def get_session(phone):
         }
     return user_sessions[phone]
 
-async def generate_tts(text, filename):
+async def generate_tts(text, wav_filename):
+    # 1. יצירת קובץ MP3 זמני ממיקרוסופט
+    temp_mp3 = wav_filename + ".mp3"
     communicate = edge_tts.Communicate(text, "he-IL-AvriNeural", rate="+5%")
-    await communicate.save(filename)
+    await communicate.save(temp_mp3)
+    
+    # 2. קריאת נתוני ה-MP3 ופענוח ה-Audio הגולמי
+    with open(temp_mp3, "rb") as f:
+        mp3_data = f.read()
+    
+    decoder = minimp3.Decoder()
+    mp3_reader = minimp3.read_binary(mp3_data)
+    
+    # משתנים לאיסוף השמע הגולמי
+    raw_pcm = b""
+    sample_rate = 0
+    channels = 0
+    
+    for frame in mp3_reader:
+        frame_data, frame_sample_rate, frame_channels = decoder.decode(frame)
+        raw_pcm += frame_data
+        sample_rate = frame_sample_rate
+        channels = frame_channels
+        
+    # 3. המרה מדויקת למפרט של ימות המשיח (8000Hz, מונו, 16-ביט)
+    # א. המרת ערוצים מסטריאו למונו (אם זה הגיע כסטריאו)
+    if channels == 2:
+        raw_pcm = audioop.tomono(raw_pcm, 2, 0.5, 0.5)
+        
+    # ב. שינוי שיעור הדגימה (Resampling) מ-24000Hz (ברירת המחדל של Edge) ל-8000Hz
+    state = None
+    converted_pcm, state = audioop.ratecv(raw_pcm, 2, 1, sample_rate, 8000, state)
+    
+    # 4. כתיבת קובץ ה-WAV הרשמי מסוג Windows PCM (Uncompressed)
+    with wave.open(wav_filename, "wb") as w:
+        w.setnchannels(1)      # מונו
+        w.setsampwidth(2)      # 16-bit (2 bytes)
+        w.setframerate(8000)   # 8000Hz
+        w.writeframes(converted_pcm)
+        
+    # ניקוי קובץ ה-MP3 הזמני מהשרת
+    if os.path.exists(temp_mp3):
+        os.remove(temp_mp3)
 
 @chat_bp.route('/api/chat', methods=['GET', 'POST'])
 def chat():
