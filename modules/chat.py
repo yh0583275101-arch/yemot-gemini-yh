@@ -5,6 +5,7 @@ import asyncio
 import edge_tts
 from flask import Blueprint, request
 import google.generativeai as genai
+from pydub import AudioSegment
 
 chat_bp = Blueprint('chat', __name__)
 
@@ -100,6 +101,19 @@ def chat():
             tts_filename = f"{phone}.wav"
             asyncio.run(generate_tts(answer_text, tts_filename))
             print("קובץ ה-TTS נוצר. מעלה לשלוחה 1...")
+
+            # --- התחלת בלוק ההמרה לפורמט ימות המשיח ---
+            print("ממיר את הקובץ לפורמט טלפוני של ימות המשיח...")
+            
+            # טוענים את הקובץ שיצרת הרגע (edge_tts)
+            audio = AudioSegment.from_file(tts_filename)
+            
+            # משנים את ההגדרות ל: 8000Hz, ערוץ 1 (מונו), ו-16bit
+            audio = audio.set_frame_rate(8000).set_channels(1).set_sample_width(2)
+            
+            # שומרים את הקובץ חזרה באותו שם, אבל עכשיו כ-WAV אמיתי!
+            audio.export(tts_filename, format="wav")
+            # --- סוף בלוק ההמרה ---
 
             upload_url = f"https://www.call2all.co.il/ym/api/UploadFile"
             with open(tts_filename, 'rb') as f:
