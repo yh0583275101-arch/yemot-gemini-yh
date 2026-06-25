@@ -98,7 +98,7 @@ def chat():
 
             session['history'] = chat_session.history
 
-            tts_filename = f"{phone}.wav"
+            tts_filename = f"/tmp/{phone}.wav"
             asyncio.run(generate_tts(answer_text, tts_filename))
             print("קובץ ה-TTS נוצר. מעלה לשלוחה 1...")
 
