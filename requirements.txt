@@ -4,3 +4,4 @@ edge-tts
 requests
 gunicorn
 pydub
+pyaudioop
