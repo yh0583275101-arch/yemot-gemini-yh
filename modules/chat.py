@@ -6,6 +6,7 @@ import edge_tts
 from flask import Blueprint, request
 import google.generativeai as genai
 from pydub import AudioSegment
+import traceback
 
 chat_bp = Blueprint('chat', __name__)
 
@@ -138,7 +139,8 @@ def chat():
         return f"read=f-greeting=user_audio,,record"
         
     except Exception as e:
-        print(f"!!! קריסה כללית בפונקציה: {str(e)}")
+        print("!!! קריסה כללית בפונקציה:")
+        print(traceback.format_exc())
         return "id_list_message=t-M1103"
 
 @chat_bp.route('/api/error', methods=['GET', 'POST'])
