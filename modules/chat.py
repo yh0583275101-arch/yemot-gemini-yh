@@ -139,7 +139,7 @@ def chat():
             if os.path.exists(local_audio_path): os.remove(local_audio_path)
             if os.path.exists(tts_filename): os.remove(tts_filename)
 
-            return f"read=f-/tmp/{phone}"
+            return f"read=f-{phone}=user_audio,,record,,,,no"
 
 
         # כניסה ראשונית לשלוחה
