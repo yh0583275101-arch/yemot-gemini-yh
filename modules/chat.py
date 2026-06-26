@@ -22,41 +22,37 @@ def get_session(phone):
         }
     return user_sessions[phone]
 
+import subprocess
+
 async def generate_tts(text, wav_filename):
     # 1. יצירת קובץ MP3 זמני ממיקרוסופט
     temp_mp3 = wav_filename + ".mp3"
     communicate = edge_tts.Communicate(text, "he-IL-AvriNeural", rate="+5%")
     await communicate.save(temp_mp3)
     
-    # 2. קריאת השמע הגולמי מתוך קובץ ה-MP3
-    with open(temp_mp3, "rb") as f:
-        mp3_data = f.read()
-        
-    # דילוג על ה-ID3 Header של ה-MP3 (אם קיים) כדי להגיע לנתוני השמע הנקיים
-    start_idx = 0
-    if mp3_data.startswith(b"ID3"):
-        # קריאת גודל ה-Header של ID3v2
-        size = (mp3_data[6] << 21) | (mp3_data[7] << 14) | (mp3_data[8] << 7) | mp3_data[9]
-        start_idx = 10 + size
+    # 2. שימוש ב-FFmpeg המובנה של השרת כדי להמיר בצורה מושלמת ל-WAV טלפוני
+    # הפקודה הזו כופה: מקודד PCM 16-bit, ערוץ 1 (מונו), ותדר 8000Hz
+    command = [
+        'ffmpeg', '-y', 
+        '-i', temp_mp3, 
+        '-acodec', 'pcm_s16le', 
+        '-ac', '1', 
+        '-ar', '8000', 
+        wav_filename
+    ]
     
-    raw_audio = mp3_data[start_idx:]
+    # הרצת פקודת ההמרה בשרת
+    process = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
-    # מיקרוסופט שולחת את ה-MP3 ב-24000Hz, מונו, 16-ביט (בקצב של 48kbps)
-    # נבצע שינוי שיעור דגימה (Resampling) מ-24000Hz ל-8000Hz של ימות המשיח
-    state = None
-    converted_pcm, state = audioop.ratecv(raw_audio, 2, 1, 24000, 8000, state)
-    
-    # 3. כתיבת קובץ ה-WAV הרשמי מסוג Windows PCM (Uncompressed)
-    with wave.open(wav_filename, "wb") as w:
-        w.setnchannels(1)      # מונו
-        w.setsampwidth(2)      # 16-bit (2 bytes)
-        w.setframerate(8000)   # 8000Hz
-        w.writeframes(converted_pcm)
-        
     # ניקוי קובץ ה-MP3 הזמני מהשרת
     if os.path.exists(temp_mp3):
         os.remove(temp_mp3)
-
+        
+    # בדיקה אם ההמרה הצליחה, אם לא - נדפיס את השגיאה ללוג
+    if process.returncode != 0:
+        print(f"!!! שגיאה בהמרת FFmpeg: {process.stderr.decode('utf-8', errors='ignore')}")
+        raise Exception("FFmpeg conversion failed")
+        
 @chat_bp.route('/api/chat', methods=['GET', 'POST'])
 def chat():
     try:
