@@ -8,6 +8,7 @@ import google.generativeai as genai
 import traceback
 import wave
 import audioop
+from pydub import AudioSegment
 
 chat_bp = Blueprint('chat', __name__)
 
@@ -30,28 +31,30 @@ async def generate_tts(text, wav_filename):
     communicate = edge_tts.Communicate(text, "he-IL-AvriNeural", rate="+5%")
     await communicate.save(temp_mp3)
     
-    # 2. שימוש ב-FFmpeg המובנה של השרת כדי להמיר בצורה מושלמת ל-WAV טלפוני
-    # הפקודה הזו כופה: מקודד PCM 16-bit, ערוץ 1 (מונו), ותדר 8000Hz
-    command = [
-        'ffmpeg', '-y', 
-        '-i', temp_mp3, 
-        '-acodec', 'pcm_s16le', 
-        '-ac', '1', 
-        '-ar', '8000', 
-        wav_filename
-    ]
+    # 2. קריאת קובץ ה-MP3 לתוך הזיכרון כנתוני שמע גולמיים
+    sound = AudioSegment.from_mp3(temp_mp3)
+    raw_audio = sound.raw_data          # השמע הגולמי
+    sample_rate = sound.frame_rate      # בדרך כלל 24000Hz
+    channels = sound.channels            # בדרך כלל 1 (מונו)
     
-    # הרצת פקודת ההמרה בשרת
-    process = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # 3. שינוי שיעור הדגימה (Resampling) ל-8000Hz של ימות המשיח
+    state = None
+    converted_pcm, state = audioop.ratecv(raw_audio, 2, channels, sample_rate, 8000, state)
     
+    # אם הקובץ המקורי היה סטריאו (2 ערוצים), נהפוך אותו למונו
+    if channels == 2:
+        converted_pcm = audioop.tomono(converted_pcm, 2, 0.5, 0.5)
+    
+    # 4. כתיבת קובץ ה-WAV הרשמי מסוג Windows PCM (Uncompressed)
+    with wave.open(wav_filename, "wb") as w:
+        w.setnchannels(1)      # מונו
+        w.setsampwidth(2)      # 16-bit
+        w.setframerate(8000)   # 8000Hz
+        w.writeframes(converted_pcm)
+        
     # ניקוי קובץ ה-MP3 הזמני מהשרת
     if os.path.exists(temp_mp3):
         os.remove(temp_mp3)
-        
-    # בדיקה אם ההמרה הצליחה, אם לא - נדפיס את השגיאה ללוג
-    if process.returncode != 0:
-        print(f"!!! שגיאה בהמרת FFmpeg: {process.stderr.decode('utf-8', errors='ignore')}")
-        raise Exception("FFmpeg conversion failed")
         
 @chat_bp.route('/api/chat', methods=['GET', 'POST'])
 def chat():
