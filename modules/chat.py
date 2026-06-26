@@ -8,7 +8,6 @@ import google.generativeai as genai
 import traceback
 import wave
 import audioop
-import minimp3
 
 chat_bp = Blueprint('chat', __name__)
 
@@ -29,34 +28,25 @@ async def generate_tts(text, wav_filename):
     communicate = edge_tts.Communicate(text, "he-IL-AvriNeural", rate="+5%")
     await communicate.save(temp_mp3)
     
-    # 2. קריאת נתוני ה-MP3 ופענוח ה-Audio הגולמי
+    # 2. קריאת השמע הגולמי מתוך קובץ ה-MP3
     with open(temp_mp3, "rb") as f:
         mp3_data = f.read()
-    
-    decoder = minimp3.Decoder()
-    mp3_reader = minimp3.read_binary(mp3_data)
-    
-    # משתנים לאיסוף השמע הגולמי
-    raw_pcm = b""
-    sample_rate = 0
-    channels = 0
-    
-    for frame in mp3_reader:
-        frame_data, frame_sample_rate, frame_channels = decoder.decode(frame)
-        raw_pcm += frame_data
-        sample_rate = frame_sample_rate
-        channels = frame_channels
         
-    # 3. המרה מדויקת למפרט של ימות המשיח (8000Hz, מונו, 16-ביט)
-    # א. המרת ערוצים מסטריאו למונו (אם זה הגיע כסטריאו)
-    if channels == 2:
-        raw_pcm = audioop.tomono(raw_pcm, 2, 0.5, 0.5)
-        
-    # ב. שינוי שיעור הדגימה (Resampling) מ-24000Hz (ברירת המחדל של Edge) ל-8000Hz
+    # דילוג על ה-ID3 Header של ה-MP3 (אם קיים) כדי להגיע לנתוני השמע הנקיים
+    start_idx = 0
+    if mp3_data.startswith(b"ID3"):
+        # קריאת גודל ה-Header של ID3v2
+        size = (mp3_data[6] << 21) | (mp3_data[7] << 14) | (mp3_data[8] << 7) | mp3_data[9]
+        start_idx = 10 + size
+    
+    raw_audio = mp3_data[start_idx:]
+    
+    # מיקרוסופט שולחת את ה-MP3 ב-24000Hz, מונו, 16-ביט (בקצב של 48kbps)
+    # נבצע שינוי שיעור דגימה (Resampling) מ-24000Hz ל-8000Hz של ימות המשיח
     state = None
-    converted_pcm, state = audioop.ratecv(raw_pcm, 2, 1, sample_rate, 8000, state)
+    converted_pcm, state = audioop.ratecv(raw_audio, 2, 1, 24000, 8000, state)
     
-    # 4. כתיבת קובץ ה-WAV הרשמי מסוג Windows PCM (Uncompressed)
+    # 3. כתיבת קובץ ה-WAV הרשמי מסוג Windows PCM (Uncompressed)
     with wave.open(wav_filename, "wb") as w:
         w.setnchannels(1)      # מונו
         w.setsampwidth(2)      # 16-bit (2 bytes)
