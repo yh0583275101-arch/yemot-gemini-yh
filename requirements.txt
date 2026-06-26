@@ -3,4 +3,3 @@ google-generativeai
 edge-tts
 requests
 gunicorn
-minimp3
