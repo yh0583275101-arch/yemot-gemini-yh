@@ -143,7 +143,7 @@ def chat():
 
 
         # כניסה ראשונית לשלוחה
-        return f"read=f-greeting=user_audio,,record"
+        return f"read=f-greeting=user_audio,,record,,no"
         
     except Exception as e:
         print("!!! קריסה כללית בפונקציה:")
