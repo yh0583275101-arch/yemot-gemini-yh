@@ -6,7 +6,6 @@ import edge_tts
 from flask import Blueprint, request
 import google.generativeai as genai
 import traceback
-import os
 import soundfile as sf
 from scipy.signal import resample
 
@@ -23,28 +22,23 @@ def get_session(phone):
         }
     return user_sessions[phone]
 
-import subprocess
-
 async def generate_tts(text, wav_filename):
     # 1. יצירת קובץ MP3 זמני ממיקרוסופט
     temp_mp3 = wav_filename + ".mp3"
     communicate = edge_tts.Communicate(text, "he-IL-AvriNeural", rate="+5%")
     await communicate.save(temp_mp3)
     
-    # 2. קריאת קובץ ה-MP3 שנוצר
-    # סאונדפייל/סקיפי יפתחו את הקובץ ויקראו את האודיו הגולמי בצורה אוטומטית ומדויקת
+    # 2. קריאת קובץ ה-MP3 שנוצר בצורה אוטומטית ומדויקת
     data, sample_rate = sf.read(temp_mp3)
     
-    # מיקרוסופט מוציאה בדרך כלל קובץ מונו בתדר 24000Hz.
-    # 3. חישוב כמות הדגימות החדשה כדי להגיע בדיוק ל-8000Hz (תדר היעד של ימות המשיח)
+    # 3. חישוב כמות הדגימות החדשה כדי להגיע בדיוק ל-8000Hz (התדר של ימות המשיח)
     target_rate = 8000
     number_of_samples = int(len(data) * target_rate / sample_rate)
     
-    # ביצוע Resampling (שינוי תדר) מתמטי נקי לחלוטין למניעת רעשים
+    # ביצוע שינוי תדר מתמטי נקי לחלוטין למניעת רעשים מוזרים
     resampled_data = resample(data, number_of_samples)
     
-    # 4. שמירה ישירה כקובץ WAV מסוג Windows PCM 16-bit
-    # הפקודה 'PCM_16' מכריחה את המערכת לייצר בדיוק קובץ Windows PCM (Uncompressed)
+    # 4. שמירה ישירה כקובץ WAV מסוג Windows PCM 16-bit נקי
     sf.write(wav_filename, resampled_data, target_rate, subtype='PCM_16')
     
     # ניקוי קובץ ה-MP3 הזמני מהשרת
