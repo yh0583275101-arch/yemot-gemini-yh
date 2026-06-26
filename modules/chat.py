@@ -6,8 +6,9 @@ import edge_tts
 from flask import Blueprint, request
 import google.generativeai as genai
 import traceback
-import wave
-import audioop
+import os
+import soundfile as sf
+from scipy.signal import resample
 
 chat_bp = Blueprint('chat', __name__)
 
@@ -30,33 +31,23 @@ async def generate_tts(text, wav_filename):
     communicate = edge_tts.Communicate(text, "he-IL-AvriNeural", rate="+5%")
     await communicate.save(temp_mp3)
     
-    # 2. קריאת הביטים הגולמיים של ה-MP3
-    with open(temp_mp3, "rb") as f:
-        mp3_data = f.read()
-        
-    # מיקרוסופט (edge_tts) מייצרת MP3 בפורמט קבוע: 24000Hz, מונו, 16-ביט
-    # נחלץ את האודיו הגולמי על ידי דילוג על ה-Header של ה-MP3 (בדרך כלל ID3v2)
-    start_idx = 0
-    if mp3_data.startswith(b"ID3"):
-        # חישוב מדויק של גודל ה-Header של ID3v2
-        size = (mp3_data[6] << 21) | (mp3_data[7] << 14) | (mp3_data[8] << 7) | mp3_data[9]
-        start_idx = 10 + size
-        
-    raw_audio = mp3_data[start_idx:]
+    # 2. קריאת קובץ ה-MP3 שנוצר
+    # סאונדפייל/סקיפי יפתחו את הקובץ ויקראו את האודיו הגולמי בצורה אוטומטית ומדויקת
+    data, sample_rate = sf.read(temp_mp3)
     
-    # 3. המרת תדר מ-24000Hz (של מיקרוסופט) ל-8000Hz (של ימות המשיח)
-    state = None
-    # 2 bytes per sample (16-bit), 1 channel (mono)
-    converted_pcm, state = audioop.ratecv(raw_audio, 2, 1, 24000, 8000, state)
+    # מיקרוסופט מוציאה בדרך כלל קובץ מונו בתדר 24000Hz.
+    # 3. חישוב כמות הדגימות החדשה כדי להגיע בדיוק ל-8000Hz (תדר היעד של ימות המשיח)
+    target_rate = 8000
+    number_of_samples = int(len(data) * target_rate / sample_rate)
     
-    # 4. כתיבת קובץ ה-WAV הרשמי בפורמט Windows PCM (Uncompressed) המושלם
-    with wave.open(wav_filename, "wb") as w:
-        w.setnchannels(1)      # מונו
-        w.setsampwidth(2)      # 16-bit
-        w.setframerate(8000)   # 8000Hz
-        w.writeframes(converted_pcm)
-        
-    # ניקוי קובץ ה-MP3 הזמני
+    # ביצוע Resampling (שינוי תדר) מתמטי נקי לחלוטין למניעת רעשים
+    resampled_data = resample(data, number_of_samples)
+    
+    # 4. שמירה ישירה כקובץ WAV מסוג Windows PCM 16-bit
+    # הפקודה 'PCM_16' מכריחה את המערכת לייצר בדיוק קובץ Windows PCM (Uncompressed)
+    sf.write(wav_filename, resampled_data, target_rate, subtype='PCM_16')
+    
+    # ניקוי קובץ ה-MP3 הזמני מהשרת
     if os.path.exists(temp_mp3):
         os.remove(temp_mp3)
         
