@@ -58,8 +58,26 @@ def chat():
             session['next_topic_id'] += 1
             session['current_file_idx'] = 1
             
-            # שלוחה 1 אומרת למערכת להקליט ישירות לתוך תיקיית הנושא החדש בשלוחה 2!
-            topic_folder = f"2/{session['current_topic_id']}"
+            topic_id = session['current_topic_id']
+            topic_folder = f"2/{topic_id}"
+            
+            # --- קסם: יצירת קובץ ext.ini פנימי אוטומטית בתוך ימות המשיח לתת-השלוחה החדשה! ---
+            ini_content = "\ntype=play_folder\nplay_folder_stars_go_to=/1\n"
+            ini_filename = f"/tmp/ext_{phone}.ini"
+            with open(ini_filename, "w", encoding="utf-8") as f:
+                f.write(ini_content)
+                
+            # העלאת קובץ ההגדרות ישירות לתיקיית השיחה החדשה
+            upload_url = f"https://www.call2all.co.il/ym/api/UploadFile"
+            with open(ini_filename, 'rb') as f:
+                requests.post(upload_url, data={
+                    'token': f"{yemot_num}:{yemot_pass}",
+                    'path': f"ivr2:2/{topic_id}/ext.ini"
+                }, files={'file': f})
+            
+            if os.path.exists(ini_filename): os.remove(ini_filename)
+            # ----------------------------------------------------------------------------------
+            
             return f"read=f-greeting=user_audio,record,{topic_folder},001,no"
 
         # המשך שיחה זורמת בתוך הנושא הקיים
