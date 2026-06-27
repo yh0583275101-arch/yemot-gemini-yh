@@ -86,4 +86,4 @@ def set_prompt():
         return f"read=M1309=mode,Number,1,1,1,,yes&api_link_append=user_audio={user_audio}"
 
     # שלב א': בקשת הקלטה ראשונית
-    return "read=M1006=user_audio,,record,,,no"
+    return "read=f-greeting=user_audio,,record,,,no"
