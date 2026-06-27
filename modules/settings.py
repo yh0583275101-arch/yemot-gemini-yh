@@ -18,6 +18,11 @@ def topics_menu():
     
     topics_path = f"2/{phone}_topics.txt"
     topics_text = download_ym_text(yemot_num, yemot_pass, topics_path)
+    
+    # תנאי מגן: אם הקובץ ריק או לא קיים, לא ננסה לפצל אותו
+    if not topics_text or "|" not in topics_text:
+        return "id_list_message=t-אין שיחות מוקלטות במערכת&go_to_folder=/"
+        
     topics_list = [line.split('|') for line in topics_text.split('\n') if '|' in line]
     
     if not topics_list:
