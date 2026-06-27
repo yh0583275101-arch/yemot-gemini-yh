@@ -95,13 +95,14 @@ def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topi
     with open(tts_filename, 'rb') as f:
         upload_ym_bytes(yemot_num, yemot_pass, f"2/{topic_id}/{ans_idx:03d}.wav", f.read(), f"{ans_idx:03d}.wav")
         
-    # אם זה נושא חדש, מייצרים כותרת ומעדכנים את רשימת הנושאים
+    # אם זה נושא חדש, מייצרים כותרת ומעדכנים את רשימת הנושאים האישית של המשתמש
     if is_new_topic and file_idx == 1:
         title_res = model.generate_content(f"תן כותרת קצרה מנוקדת בת 2 עד 3 מילים עבור הטקסט הבא (ללא תווים מיוחדים): {answer_text}")
         title = title_res.text.strip()
-        topics_text = download_ym_text(yemot_num, yemot_pass, "2/topics.txt")
+        topics_path = f"2/{phone}_topics.txt"
+        topics_text = download_ym_text(yemot_num, yemot_pass, topics_path)
         new_topics_text = (topics_text + f"\n{topic_id}|{title}").strip()
-        upload_ym_bytes(yemot_num, yemot_pass, "2/topics.txt", new_topics_text.encode('utf-8'), "topics.txt")
+        upload_ym_bytes(yemot_num, yemot_pass, topics_path, new_topics_text.encode('utf-8'), f"{phone}_topics.txt")
         
     if os.path.exists(local_audio_path): os.remove(local_audio_path)
     if os.path.exists(tts_filename): os.remove(tts_filename)
