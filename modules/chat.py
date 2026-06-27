@@ -137,7 +137,7 @@ def chat():
             ini_content = "type=play_folder\nplay_folder_stars_go_to=/4\n"
             upload_ym_bytes(yemot_num, yemot_pass, f"2/{topic_id}/ext.ini", ini_content.encode('utf-8'), "ext.ini")
             
-            return "read=greeting=user_audio,,record,,,no"
+            return "read=f-greeting=user_audio,,record,,,no"
             
         # המשך שיחה קיימת בשלוחה 1
         topic_id = download_ym_text(yemot_num, yemot_pass, f"1/{phone}_current_topic.txt")
