@@ -108,7 +108,7 @@ def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topi
     if os.path.exists(tts_filename): os.remove(tts_filename)
     
     # השמעת התשובה מתוך שלוחה 2, והמשך הקלטה רציפה ישירות לשם!
-    return f"read=f-2/{topic_id}/{ans_idx:03d}=user_audio,,record,,,no"
+    return f"read=f-2/{topic_id}/{ans_idx:03d}.wav=user_audio,,record,,,no"
 
 # --- שלוחה 1: שיחה חדשה ---
 @chat_bp.route('/api/chat', methods=['GET', 'POST'])
