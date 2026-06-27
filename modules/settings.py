@@ -16,7 +16,8 @@ def topics_menu():
     yemot_num = args.get('yemot_num')
     yemot_pass = args.get('yemot_pass')
     
-    topics_text = download_ym_text(yemot_num, yemot_pass, "2/topics.txt")
+    topics_path = f"2/{phone}_topics.txt"
+    topics_text = download_ym_text(yemot_num, yemot_pass, topics_path)
     topics_list = [line.split('|') for line in topics_text.split('\n') if '|' in line]
     
     if not topics_list:
