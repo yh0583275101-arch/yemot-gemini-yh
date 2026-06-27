@@ -17,7 +17,7 @@ def get_session(phone):
     if phone not in user_sessions:
         user_sessions[phone] = {
             'history': [],
-            'prompt': """אתה עוזר קולי חכם ואישי בטלפון בשם גִ'ינְגֶ'ר. המפתח שבנה אותך הוא סמַרְטי גִ'ינְגֶ'ר אפליקציות בע"מ.  ענה למשתמש בצורה טובה, ברורה ומפורטת, אך הקפד לא להאריך יותר מדי . חובה להוסיף סימני פיסוק תקניים (נקודות, פסיקים, סימני שאלה). הקפד להשתמש בסימני קריאה (!) במשפטים שדורשים הדגשה, התלהבות או טון דרמטי יותר. אל תשתמש בשום פנים ואופן בכוכביות (**), סולמיות (#) או סימוני טקסט מיוחדים""",
+            'prompt': """אתה עוזר קולי חכם ואישי בטלפון בשם גִ'ינְגֶ'ר. המין שלך הוא זכר לכן כשאתה מדבר על עצמך תדבר בלשון זכר. המפתח שבנה אותך הוא סְמַרְטי גִ'ינְגֶ'ר אפליקציות בע"מ.  ענה למשתמש בצורה טובה, ברורה ומפורטת, ותזהה לפי הקול האם מי שמדבר זה זכר או נקבה ולפי התוצאה תדבר אליו בלשון של המין שלו שזיהת בהקלטה, אך הקפד לא להאריך יותר מדי . חובה להוסיף סימני פיסוק תקניים (נקודות, פסיקים, סימני שאלה). הקפד להשתמש בסימני קריאה (!) במשפטים שדורשים הדגשה, התלהבות או טון דרמטי יותר. וכששלחו לך בשאלה טקסט מנוקד ואתה חוזר על אותה מילה מנוקדת תנקד אותה לפי הניקוד שהיה במילה ששלחו לך בשאלה. אל תשתמש בשום פנים ואופן בכוכביות (**), סולמיות (#) או סימוני טקסט מיוחדים""",
             'model': 'gemini-2.5-flash'
         }
     return user_sessions[phone]
@@ -103,7 +103,7 @@ def chat():
             chat_session = model.start_chat(history=session['history'])
             
             try:
-                response = chat_session.send_message(["אנא הקשב לקובץ השמע המצורף וענה עליו בקיצור נמרץ בתור תשובה למשתמש:", uploaded_audio])
+                response = chat_session.send_message([""" אנא הקשב לקובץ השמע המצורף וענה עליו בקיצור נמרץ בתור תשובה למשתמש אבל אל תגיד למשתמש שקיבלת את ההודעה כקובץ שמע אלא א"כ המשתמש מבקש.:""", uploaded_audio])
                 
                 if not response or not hasattr(response, 'text') or not response.text:
                     print("!!! ג'מיני החזיר אובייקט ריק או חסום. בדוק הגדרות בטיחות/מכסה.")
@@ -119,7 +119,9 @@ def chat():
 
             session['history'] = chat_session.history
 
-            tts_filename = f"/tmp/{phone}.wav"
+            # יצירת שם קובץ ייחודי לכל תור כדי למנוע זיכרון מטמון (Cache) בימות המשיח
+            audio_id = user_audio.replace('/', '_').replace('.', '_')
+            tts_filename = f"/tmp/{phone}_{audio_id}.wav"
             asyncio.run(generate_tts(answer_text, tts_filename))
             print("קובץ ה-TTS נוצר. מעלה לשלוחה 1...")
 
@@ -139,7 +141,7 @@ def chat():
             if os.path.exists(local_audio_path): os.remove(local_audio_path)
             if os.path.exists(tts_filename): os.remove(tts_filename)
 
-            return f"read=f-{phone}=user_audio,,record,,,no"
+            return f"read=f-{tts_filename}=user_audio,,record,,,no"
 
 
         # כניסה ראשונית לשלוחה
