@@ -3,7 +3,7 @@ import requests
 import asyncio
 from flask import Blueprint, request
 import google.generativeai as genai
-from modules.chat import get_session, generate_tts
+from modules.chat import generate_tts, download_ym_text, upload_ym_bytes
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -16,31 +16,32 @@ def topics_menu():
     yemot_num = args.get('yemot_num')
     yemot_pass = args.get('yemot_pass')
     
-    session = get_session(phone)
-    total_topics = session['next_topic_id'] - 1
+    topics_text = download_ym_text(yemot_num, yemot_pass, "2/topics.txt")
+    topics_list = [line.split('|') for line in topics_text.split('\n') if '|' in line]
     
-    if total_topics == 0:
+    if not topics_list:
         return "id_list_message=t-אין שיחות מוקלטות במערכת&go_to_folder=/"
         
     if selection and selection.isdigit():
-        topic_id = int(selection)
-        if 1 <= topic_id <= total_topics:
-            session['current_topic_id'] = topic_id
+        idx = int(selection) - 1
+        if 0 <= idx < len(topics_list):
+            topic_id = topics_list[idx][0]
+            # שמירת מזהה הנושא האחרון שהמשתמש בחר להאזנה
+            upload_ym_bytes(yemot_num, yemot_pass, f"2/{phone}_last_selected.txt", topic_id.encode('utf-8'), f"{phone}_last_selected.txt")
             return f"go_to_folder=/2/{topic_id}"
 
     menu_text = "להאזנה לשיחות הקודמות שלך. "
-    for i in range(1, total_topics + 1):
-        menu_text += f"עבור שיחה מספר {i}, הקש {i}. "
+    for i, (topic_id, title) in enumerate(topics_list):
+        menu_text += f"עבור שיחה מספר {i+1} בנושא {title}, הקש {i+1}. "
         
     menu_filename = f"/tmp/menu_{phone}.wav"
     asyncio.run(generate_tts(menu_text, menu_filename))
     
-    upload_url = f"https://www.call2all.co.il/ym/api/UploadFile"
     with open(menu_filename, 'rb') as f:
-        requests.post(upload_url, data={'token': f"{yemot_num}:{yemot_pass}", 'path': f"ivr2:2/menu_{phone}.wav"}, files={'file': f})
+        upload_ym_bytes(yemot_num, yemot_pass, f"2/menu_{phone}.wav", f.read(), f"menu_{phone}.wav")
     if os.path.exists(menu_filename): os.remove(menu_filename)
     
-    return f"read=2/menu_{phone}=selection,Number,1,1,{total_topics},,yes"
+    return f"read=2/menu_{phone}=selection,Number,1,1,{len(topics_list)},,yes"
 
 
 # --- שלוחה 3: הגדרת פרומפט אישי ושמירתו כקובץ טקסט בימות המשיח ---
@@ -52,9 +53,9 @@ def set_prompt():
     gemini_key = args.get('gemini_key')
     yemot_num = args.get('yemot_num')
     yemot_pass = args.get('yemot_pass')
-    mode = args.get('mode') # קבלת הבחירה: 1 לדריסה, 2 להוספה
+    mode = args.get('mode')
     
-    # שלב ב': המשתמש בחר מצב (דריסה/הוספה) ואנחנו מעבדים את ההקלטה
+    # שלב ג': עיבוד ההקלטה ושמירה לפי הבחירה (דריסה או הוספה)
     if user_audio and mode:
         genai.configure(api_key=gemini_key)
         download_url = f"https://www.call2all.co.il/ym/api/DownloadFile?token={yemot_num}:{yemot_pass}&path=ivr2:{user_audio}"
@@ -65,41 +66,24 @@ def set_prompt():
             
         uploaded = genai.upload_file(local_audio)
         model = genai.GenerativeModel('gemini-2.5-flash')
-        response = model.generate_content(["תמלל את הקלטת המשתמש הזו במלואה מילה במילה ללא תוספות:", uploaded])
+        response = model.generate_content(["תמלל את קלטת המשתמש הזו במלואה מילה במילה ללא תוספות:", uploaded])
         new_text = response.text.strip()
         
-        # בדיקה האם קיים כבר קובץ טקסט קודם בשלוחה 3 כדי להוסיף עליו
-        existing_text = ""
-        check_url = f"https://www.call2all.co.il/ym/api/DownloadFile?token={yemot_num}:{yemot_pass}&path=ivr2:3/{phone}_prompt.txt"
-        res_check = requests.get(check_url)
-        if res_check.status_code == 200:
-            existing_text = res_check.text.strip()
+        existing_text = download_ym_text(yemot_num, yemot_pass, f"3/{phone}_prompt.txt")
 
-        # קביעת הטקסט הסופי לפי בחירת המשתמש
         if mode == "2" and existing_text:
             final_text = existing_text + "\n" + new_text
         else:
             final_text = new_text
 
-        # שמירת קובץ הטקסט המעודכן זמנית בשרת
-        txt_filename = f"/tmp/{phone}_prompt.txt"
-        with open(txt_filename, "w", encoding="utf-8") as f:
-            f.write(final_text)
-            
-        # העלאת קובץ הטקסט הקבוע לשלוחה 3 של המשתמש בימות המשיח!
-        upload_url = f"https://www.call2all.co.il/ym/api/UploadFile"
-        with open(txt_filename, 'rb') as f:
-            requests.post(upload_url, data={'token': f"{yemot_num}:{yemot_pass}", 'path': f"ivr2:3/{phone}_prompt.txt"}, files={'file': f})
-            
+        upload_ym_bytes(yemot_num, yemot_pass, f"3/{phone}_prompt.txt", final_text.encode('utf-8'), f"{phone}_prompt.txt")
         if os.path.exists(local_audio): os.remove(local_audio)
-        if os.path.exists(txt_filename): os.remove(txt_filename)
         
         return "id_list_message=t-ההנחיה האישית שלך עודכנה ונשמרה בהצלחה&go_to_folder=/"
 
-    # שלב א': המשתמש הקליט, עכשיו נשאל אותו האם לדרוס או להוסיף
+    # שלב ב': המשתמש סיים להקליט, נשאל אותו האם להחליף או להוסיף
     if user_audio and not mode:
-        return f"read=M1309=mode,Number,1,1,1,,yes&api_link_append=user_audio={user_audio}" 
-        # M1309 משמיע תפריט בחירה: להחלפה הקש 1, להוספה הקש 2
+        return f"read=M1309=mode,Number,1,1,1,,yes&api_link_append=user_audio={user_audio}"
 
-    # תחילת התהליך: בקשת הקלטה מהמשתמש (הודעה כללית נא להקליט לאחר הצפצוף)
-    return "read=M1006=user_audio,record,3,prompt_temp,no"
+    # שלב א': בקשת הקלטה ראשונית
+    return "read=M1006=user_audio,,record,,,no"
