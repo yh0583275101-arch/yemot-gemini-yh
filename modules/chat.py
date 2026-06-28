@@ -28,29 +28,17 @@ def upload_ym_bytes(yemot_num, yemot_pass, path, content_bytes, filename="file.w
         'path': f"ivr2:{path}"
     }, files=files)
 
-# --- פונקציית ההמרה המדויקת והנכונה שלך! ---
+# פונקציית ההמרה המדויקת והנכונה שלך ל-8000Hz PCM_16
 async def generate_tts(text, wav_filename):
-    # 1. יצירת קובץ MP3 זמני ממיקרוסופט
     temp_mp3 = wav_filename + ".mp3"
     communicate = edge_tts.Communicate(text, "he-IL-AvriNeural", rate="+5%")
     await communicate.save(temp_mp3)
-    
-    # 2. קריאת קובץ ה-MP3 שנוצר בצורה אוטומטית ומדויקת
     data, sample_rate = sf.read(temp_mp3)
-    
-    # 3. חישוב כמות הדגימות החדשה כדי להגיע בדיוק ל-8000Hz (התדר של ימות המשיח)
     target_rate = 8000
     number_of_samples = int(len(data) * target_rate / sample_rate)
-    
-    # ביצוע שינוי תדר מתמטי נקי לחלוטין למניעת רעשים מוזרים
     resampled_data = resample(data, number_of_samples)
-    
-    # 4. שמירה ישירה כקובץ WAV מסוג Windows PCM 16-bit נקי
     sf.write(wav_filename, resampled_data, target_rate, subtype='PCM_16')
-    
-    # ניקוי קובץ ה-MP3 הזמני מהשרת
-    if os.path.exists(temp_mp3):
-        os.remove(temp_mp3)
+    if os.path.exists(temp_mp3): os.remove(temp_mp3)
 
 # פונקציה מרכזית שמנהלת תור של שיחה (הורדה, העלאה לג'מיני, יצירת TTS וארכוב בשלוחה 2)
 def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topic_id, is_new_topic=False):
@@ -69,12 +57,21 @@ def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topi
     history_text = download_ym_text(yemot_num, yemot_pass, history_path)
     history = json.loads(history_text) if history_text else []
     
-    # חישוב האינדקס של הקובץ הבא בשרשור (1, 3, 5 לשאלות משתמש)
-    file_idx = len(history) * 2 + 1
+    # --- חישוב שמות הקבצים החדשים לפי המבנה המבוקש (H, H1, H2... / Y, Y1, Y2...) ---
+    turn_index = len(history)
+    if turn_index == 0:
+        user_filename = "H.wav"
+        bot_filename = "Y.wav"
+        bot_filename_no_ext = "Y"
+    else:
+        user_filename = f"H{turn_index}.wav"
+        bot_filename = f"Y{turn_index}.wav"
+        bot_filename_no_ext = f"Y{turn_index}"
+    # ----------------------------------------------------------------------------------
     
-    # שמירת שאלת המשתמש בארכיון השיחה בשלוחה 2
+    # שמירת שאלת המשתמש בארכיון השיחה בשלוחה 2 תחת השם החדש (H / H1 / H2...)
     with open(local_audio_path, 'rb') as f:
-        upload_ym_bytes(yemot_num, yemot_pass, f"2/{topic_id}/{file_idx:03d}.wav", f.read(), f"{file_idx:03d}.wav")
+        upload_ym_bytes(yemot_num, yemot_pass, f"2/{topic_id}/{user_filename}", f.read(), user_filename)
         
     # 3. פנייה לג'מיני לקבלת תשובה
     genai.configure(api_key=gemini_key)
@@ -100,18 +97,17 @@ def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topi
         })
     upload_ym_bytes(yemot_num, yemot_pass, history_path, json.dumps(updated_history).encode('utf-8'), "history.json")
     
-    # 4. יצירת קובץ התשובה המנוקד של אברי באמצעות הפונקציה המתוקנת שלך
-    ans_idx = file_idx + 1
+    # 4. יצירת קובץ התשובה המנוקד של אברי
     tts_filename = f"/tmp/ans_{phone}.wav"
     asyncio.run(generate_tts(answer_text, tts_filename))
     
-    # העלאת תשובת אברי ישירות למיקום השרשור בשלוחה 2
+    # העלאת תשובת אברי ישירות למיקום השרשור בשלוחה 2 תחת השם החדש (Y / Y1 / Y2...)
     with open(tts_filename, 'rb') as f:
-        upload_ym_bytes(yemot_num, yemot_pass, f"2/{topic_id}/{ans_idx:03d}.wav", f.read(), f"{ans_idx:03d}.wav")
+        upload_ym_bytes(yemot_num, yemot_pass, f"2/{topic_id}/{bot_filename}", f.read(), bot_filename)
         
     # אם זה נושא חדש לגמרי וזו השאלה הראשונה, נבקש מג'מיני כותרת ונעדכן את רשימת הנושאים האישית
-    if is_new_topic and file_idx == 1:
-        title_res = model.generate_content(f"""תן כותרת קצרה מנוקדת בת 2 עד 3 מילים עבור הטקסט הבא (ללא תווים מיוחדים) ואל תכתוב בתשובה שלך טקסט כגון "בטח הנה כותרת... אלא תתן ישר כותרת למשל מה זה תרופת פלצבו: {answer_text}""")
+    if is_new_topic and turn_index == 0:
+        title_res = model.generate_content(f"תן כותרת קצרה מנוקדת בת 2 עד 3 מילים עבור הטקסט הבא (ללא תווים מיוחדים) ואל תכתוב בהודעה שלך טקסט כגון בטח הנה כותרת טובה לשיחה זו... אלא פשוט תן טקסט של כותרת עינינית כגון מה זה תרופת פלצבו: {answer_text}")
         title = title_res.text.strip()
         topics_path = f"2/{phone}_topics.txt"
         topics_text = download_ym_text(yemot_num, yemot_pass, topics_path)
@@ -121,8 +117,8 @@ def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topi
     if os.path.exists(local_audio_path): os.remove(local_audio_path)
     if os.path.exists(tts_filename): os.remove(tts_filename)
     
-    # מחזירים את פקודת ההשמעה עם סיומת .wav המלאה
-    return f"read=f-2/{topic_id}/{ans_idx:03d}=user_audio,,record,,,no"
+    # מחזירים את פקודת ההשמעה המדויקת עם שם הקובץ החדש!
+    return f"read=f-2/{topic_id}/{bot_filename}=user_audio,,record,,,no"
 
 # --- שלוחה 1: שיחה חדשה ---
 @chat_bp.route('/api/chat', methods=['GET', 'POST'])
