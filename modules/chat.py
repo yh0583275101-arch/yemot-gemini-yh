@@ -12,7 +12,7 @@ from scipy.signal import resample
 chat_bp = Blueprint('chat', __name__)
 
 # פרומפט המערכת הקבוע והבסיסי שלך
-SYSTEM_PROMPT = """אתה עוזר קולי חכם ואישי בטלפון בשם גִ'ינְגֶ'ר. המין שלך הוא זכר לכן כשאתה מדבר על עצמך תדבר בלשון זכר. המפתח שבנה אותך הוא סְמַרְטי גִ'ינְגֶ'ר אפליקציות בע"מ. ענה למשתמש בצורה טובה, ברורה ומפורטת, אך הקפד לא להאריך יותר מדי . חובה להוסיף סימני פיסוק תקניים (נקודות, פסיקים, סימני שאלה). הקפד להשתמש בסימני קריאה (!) במשפטים שדורשים הדגשה, התלהבות או טון דרמטי יותר. וכששלחו לך בשאלה טקסט מנוקד ואתה חוזר על אותה מילה מנוקדת תנקד אותה לפי הניקוד שהיה במילה ששלחו לך בשאלה. בתשובה שלך אל תזכיר שאתה שומע את השאלה מקובץ שמע אלא פשוט אל תתיחס לנושא הזה אלא א"כ ביקשו ממך. אל תשתמש בשום פנים ואופן בכוכביות (**), סולמיות (#) או סימוני טקסט מיוחדים."""
+SYSTEM_PROMPT = """אתה עוזר קולי חכם ואישי בטלפון בשם גִ'ינְגֶ'ר. המין שלך הוא זכר לכן כשאתה מדבר על עצמך תדבר בלשון זכר. המפתח שבנה אותך הוא סְמַרְטי גִ'ינְגֶ'ר אפליקציות בע"מ. ענה למשתמש בצורה טובה, ברורה ומפורטת, אך הקפד לא להאריך יותר מדי . חובה להוסיף סימני פיסוק תקניים (נקודות, פסיקים, סימני שאלה). הקפד להשתמש בסימני קריאה (!) במשפטים שדורשים הדגשה, התלהבות או טון דרמטי יותר. וכששלחו לך בשאלה טקסט מנוקד ואתה חוזר על אותה מילה מנוקדת תנקד אותה לפי הניקוד שהיה במילה ששלחו לך בשאלה. אל תשתמש בשום פנים ואופן בכוכביות (**), סולמיות (#) או סימוני טקסט מיוחדים."""
 
 # פונקציות עזר לתקשורת מול ה-API של ימות המשיח
 def download_ym_text(yemot_num, yemot_pass, path):
@@ -20,23 +20,37 @@ def download_ym_text(yemot_num, yemot_pass, path):
     res = requests.get(url)
     return res.text.strip() if res.status_code == 200 else ""
 
-def upload_ym_bytes(yemot_num, yemot_pass, path, content_bytes, filename="file.txt"):
+def upload_ym_bytes(yemot_num, yemot_pass, path, content_bytes, filename="file.wav"):
     url = "https://www.call2all.co.il/ym/api/UploadFile"
+    files = {'file': (filename, content_bytes, 'audio/wav')}
     requests.post(url, data={
         'token': f"{yemot_num}:{yemot_pass}",
         'path': f"ivr2:{path}"
-    }, files={'file': (filename, content_bytes)})
+    }, files=files)
 
+# --- פונקציית ההמרה המדויקת והנכונה שלך! ---
 async def generate_tts(text, wav_filename):
+    # 1. יצירת קובץ MP3 זמני ממיקרוסופט
     temp_mp3 = wav_filename + ".mp3"
     communicate = edge_tts.Communicate(text, "he-IL-AvriNeural", rate="+5%")
     await communicate.save(temp_mp3)
+    
+    # 2. קריאת קובץ ה-MP3 שנוצר בצורה אוטומטית ומדויקת
     data, sample_rate = sf.read(temp_mp3)
+    
+    # 3. חישוב כמות הדגימות החדשה כדי להגיע בדיוק ל-8000Hz (התדר של ימות המשיח)
     target_rate = 8000
     number_of_samples = int(len(data) * target_rate / sample_rate)
+    
+    # ביצוע שינוי תדר מתמטי נקי לחלוטין למניעת רעשים מוזרים
     resampled_data = resample(data, number_of_samples)
+    
+    # 4. שמירה ישירה כקובץ WAV מסוג Windows PCM 16-bit נקי
     sf.write(wav_filename, resampled_data, target_rate, subtype='PCM_16')
-    if os.path.exists(temp_mp3): os.remove(temp_mp3)
+    
+    # ניקוי קובץ ה-MP3 הזמני מהשרת
+    if os.path.exists(temp_mp3):
+        os.remove(temp_mp3)
 
 # פונקציה מרכזית שמנהלת תור של שיחה (הורדה, העלאה לג'מיני, יצירת TTS וארכוב בשלוחה 2)
 def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topic_id, is_new_topic=False):
@@ -86,7 +100,7 @@ def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topi
         })
     upload_ym_bytes(yemot_num, yemot_pass, history_path, json.dumps(updated_history).encode('utf-8'), "history.json")
     
-    # 4. יצירת קובץ התשובה המנוקד של אברי
+    # 4. יצירת קובץ התשובה המנוקד של אברי באמצעות הפונקציה המתוקנת שלך
     ans_idx = file_idx + 1
     tts_filename = f"/tmp/ans_{phone}.wav"
     asyncio.run(generate_tts(answer_text, tts_filename))
@@ -107,7 +121,7 @@ def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topi
     if os.path.exists(local_audio_path): os.remove(local_audio_path)
     if os.path.exists(tts_filename): os.remove(tts_filename)
     
-    # התיקון: מחזירים את פקודת ההשמעה עם סיומת .wav המלאה!
+    # מחזירים את פקודת ההשמעה עם סיומת .wav המלאה
     return f"read=f-2/{topic_id}/{ans_idx:03d}=user_audio,,record,,,no"
 
 # --- שלוחה 1: שיחה חדשה ---
