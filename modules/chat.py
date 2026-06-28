@@ -11,10 +11,10 @@ from scipy.signal import resample
 
 chat_bp = Blueprint('chat', __name__)
 
-# פרומפט קבוע בסיסי
-SYSTEM_PROMPT = """אתה עוזר קולי חכם ואישי בטלפון בשם גִ'ינְגֶ'ר. המין שלך הוא זכר לכן כשאתה מדבר על עצמך תדבר בלשון זכר. המפתח שבנה אותך הוא סְמַרְטי גִ'ינְגֶ'ר אפליקציות בע"מ. ענה למשתמש בצורה טובה, ברורה ומפורטת, ותזהה לפי הקול האם מי שמדבר זה זכר או נקבה ולפי התוצאה תדבר אליו בלשון של המין שלו שזיהת בהקלטה, אך הקפד לא להאריך יותר מדי . חובה להוסיף סימני פיסוק תקניים (נקודות, פסיקים, סימני שאלה). הקפד להשתמש בסימני קריאה (!) במשפטים שדורשים הדגשה, התלהבות או טון דרמטי יותר. וכששלחו לך בשאלה טקסט מנוקד ואתה חוזר על אותה מילה מנוקדת תנקד אותה לפי הניקוד שהיה במילה ששלחו לך בשאלה. אל תשתמש בשום פנים ואופן בכוכביות (**), סולמיות (#) או סימוני טקסט מיוחדים."""
+# פרומפט המערכת הקבוע והבסיסי שלך
+SYSTEM_PROMPT = """אתה עוזר קולי חכם ואישי בטלפון בשם גִ'ינְגֶ'ר. המין שלך הוא זכר לכן כשאתה מדבר על עצמך תדבר בלשון זכר. המפתח שבנה אותך הוא סְמַרְטי גִ'ינְגֶ'ר אפליקציות בע"מ. ענה למשתמש בצורה טובה, ברורה ומפורטת, אך הקפד לא להאריך יותר מדי . חובה להוסיף סימני פיסוק תקניים (נקודות, פסיקים, סימני שאלה). הקפד להשתמש בסימני קריאה (!) במשפטים שדורשים הדגשה, התלהבות או טון דרמטי יותר. וכששלחו לך בשאלה טקסט מנוקד ואתה חוזר על אותה מילה מנוקדת תנקד אותה לפי הניקוד שהיה במילה ששלחו לך בשאלה. בתשובה שלך אל תזכיר שאתה שומע את השאלה מקובץ שמע אלא פשוט אל תתיחס לנושא הזה אלא א"כ ביקשו ממך. אל תשתמש בשום פנים ואופן בכוכביות (**), סולמיות (#) או סימוני טקסט מיוחדים."""
 
-# פונקציות עזר לעבודה מול ה-API של ימות המשיח
+# פונקציות עזר לתקשורת מול ה-API של ימות המשיח
 def download_ym_text(yemot_num, yemot_pass, path):
     url = f"https://www.call2all.co.il/ym/api/DownloadFile?token={yemot_num}:{yemot_pass}&path=ivr2:{path}"
     res = requests.get(url)
@@ -22,11 +22,10 @@ def download_ym_text(yemot_num, yemot_pass, path):
 
 def upload_ym_bytes(yemot_num, yemot_pass, path, content_bytes, filename="file.txt"):
     url = "https://www.call2all.co.il/ym/api/UploadFile"
-    res = requests.post(url, data={
+    requests.post(url, data={
         'token': f"{yemot_num}:{yemot_pass}",
         'path': f"ivr2:{path}"
     }, files={'file': (filename, content_bytes)})
-    return res.status_code == 200
 
 async def generate_tts(text, wav_filename):
     temp_mp3 = wav_filename + ".mp3"
@@ -39,8 +38,9 @@ async def generate_tts(text, wav_filename):
     sf.write(wav_filename, resampled_data, target_rate, subtype='PCM_16')
     if os.path.exists(temp_mp3): os.remove(temp_mp3)
 
+# פונקציה מרכזית שמנהלת תור של שיחה (הורדה, העלאה לג'מיני, יצירת TTS וארכוב בשלוחה 2)
 def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topic_id, is_new_topic=False):
-    # 1. הורדת קובץ השמע שהמשתמש הקליט
+    # 1. הורדת הקובץ שהמשתמש הרגע הקליט משלוחה 1
     download_url = f"https://www.call2all.co.il/ym/api/DownloadFile?token={yemot_num}:{yemot_pass}&path=ivr2:{user_audio}"
     res = requests.get(download_url)
     if res.status_code != 200:
@@ -50,23 +50,23 @@ def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topi
     with open(local_audio_path, 'wb') as f:
         f.write(res.content)
         
-    # 2. טעינת היסטוריית השיחה מקובץ טקסט/JSON בשלוחה 2
+    # 2. טעינת היסטוריית השיחה של הנושא הזה מתוך שלוחה 2
     history_path = f"2/{topic_id}/history.json"
     history_text = download_ym_text(yemot_num, yemot_pass, history_path)
     history = json.loads(history_text) if history_text else []
     
-    # חישוב אינדקס הקובץ הבא (למשל: 001 לשאלה ראשונה, 002 לתשובה ראשונה)
+    # חישוב האינדקס של הקובץ הבא בשרשור (1, 3, 5 לשאלות משתמש)
     file_idx = len(history) * 2 + 1
     
-    # ארכוב שאלת המשתמש ישירות בתוך תיקיית הנושא בשלוחה 2!
+    # שמירת שאלת המשתמש בארכיון השיחה בשלוחה 2
     with open(local_audio_path, 'rb') as f:
         upload_ym_bytes(yemot_num, yemot_pass, f"2/{topic_id}/{file_idx:03d}.wav", f.read(), f"{file_idx:03d}.wav")
         
-    # 3. העלאה לג'מיני וקבלת תשובה
+    # 3. פנייה לג'מיני לקבלת תשובה
     genai.configure(api_key=gemini_key)
     uploaded_audio = genai.upload_file(local_audio_path)
     
-    # קריאת פרומפט אישי משלוחה 3 אם קיים
+    # משיכת קובץ ההנחיה האישית של המשתמש משלוחה 3 במידה וקיים
     custom_prompt = download_ym_text(yemot_num, yemot_pass, f"3/{phone}_prompt.txt")
     full_system_instruction = SYSTEM_PROMPT
     if custom_prompt:
@@ -77,25 +77,25 @@ def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topi
     response = chat_session.send_message(["אנא הקשב לקובץ וענה עליו בהתאם להנחיות:", uploaded_audio])
     answer_text = response.text
     
-    # שמירת ההיסטוריה המעודכנת בחזרה לימות המשיח
-    updated_history_data = []
+    # שמירת ההיסטוריה המעודכנת חזרה לקובץ ה-JSON בשלוחה 2
+    updated_history = []
     for msg in chat_session.history:
-        updated_history_data.append({
+        updated_history.append({
             'role': msg.role,
             'parts': [part.text for part in msg.parts if hasattr(part, 'text')]
         })
-    upload_ym_bytes(yemot_num, yemot_pass, history_path, json.dumps(updated_history_data).encode('utf-8'), "history.json")
+    upload_ym_bytes(yemot_num, yemot_pass, history_path, json.dumps(updated_history).encode('utf-8'), "history.json")
     
-    # 4. יצירת קובץ ה-TTS של התשובה של אברי
+    # 4. יצירת קובץ התשובה המנוקד של אברי
     ans_idx = file_idx + 1
     tts_filename = f"/tmp/ans_{phone}.wav"
     asyncio.run(generate_tts(answer_text, tts_filename))
     
-    # העלאת תשובת אברי ישירות לתיקיית הנושא בשלוחה 2
+    # העלאת תשובת אברי ישירות למיקום השרשור בשלוחה 2
     with open(tts_filename, 'rb') as f:
         upload_ym_bytes(yemot_num, yemot_pass, f"2/{topic_id}/{ans_idx:03d}.wav", f.read(), f"{ans_idx:03d}.wav")
         
-    # אם זה נושא חדש, מייצרים כותרת ומעדכנים את רשימת הנושאים האישית של המשתמש
+    # אם זה נושא חדש לגמרי וזו השאלה הראשונה, נבקש מג'מיני כותרת ונעדכן את רשימת הנושאים האישית
     if is_new_topic and file_idx == 1:
         title_res = model.generate_content(f"תן כותרת קצרה מנוקדת בת 2 עד 3 מילים עבור הטקסט הבא (ללא תווים מיוחדים): {answer_text}")
         title = title_res.text.strip()
@@ -107,7 +107,7 @@ def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topi
     if os.path.exists(local_audio_path): os.remove(local_audio_path)
     if os.path.exists(tts_filename): os.remove(tts_filename)
     
-    # השמעת התשובה מתוך שלוחה 2, והמשך הקלטה רציפה ישירות לשם!
+    # התיקון: מחזירים את פקודת ההשמעה עם סיומת .wav המלאה!
     return f"read=f-2/{topic_id}/{ans_idx:03d}.wav=user_audio,,record,,,no"
 
 # --- שלוחה 1: שיחה חדשה ---
@@ -124,22 +124,23 @@ def chat():
         if args.get('hangup') == 'yes': return ""
         if not phone or phone == 'unknown': return ""
         
-        # כניסה ראשונית לשלוחה 1 - יצירת נושא חדש לגמרי
-        if not user_audio or user_audio == "1":
-            topics_text = download_ym_text(yemot_num, yemot_pass, "2/topics.txt")
+        # כניסה ראשונית לשלוחה 1 - פתיחת נושא חדש
+        if not user_audio:
+            topics_text = download_ym_text(yemot_num, yemot_pass, f"2/{phone}_topics.txt")
             existing_topics = [line for line in topics_text.split('\n') if '|' in line]
             topic_id = len(existing_topics) + 1
             
-            # שמירת מזהה הנושא הנוכחי בקובץ טקסט ייעודי למשתמש בשלוחה 1
+            # שמירת מזהה הנושא הפעיל כרגע בקובץ טקסט על שם המשתמש בשלוחה 1
             upload_ym_bytes(yemot_num, yemot_pass, f"1/{phone}_current_topic.txt", str(topic_id).encode('utf-8'), f"{phone}_current_topic.txt")
             
-            # יצירת קובץ ext.ini אוטומטי בתוך התיקייה החדשה בשלוחה 2
+            # יצירת קובץ הגדרות השרשור האוטומטי (ext.ini) בתוך התיקייה החדשה בשלוחה 2 עבור הכוכבית
             ini_content = "type=play_folder\nplay_folder_stars_go_to=/4\n"
             upload_ym_bytes(yemot_num, yemot_pass, f"2/{topic_id}/ext.ini", ini_content.encode('utf-8'), "ext.ini")
             
+            # השמעת קובץ הברכה הרגיל של השלוחה ובקשת הקלטה
             return "read=f-greeting=user_audio,,record,,,no"
             
-        # המשך שיחה קיימת בשלוחה 1
+        # המשך שיחה זורמת בשלוחה 1
         topic_id = download_ym_text(yemot_num, yemot_pass, f"1/{phone}_current_topic.txt")
         if not topic_id: topic_id = "1"
         
@@ -149,7 +150,7 @@ def chat():
         print(traceback.format_exc())
         return "id_list_message=t-M1103"
 
-# --- שלוחה 4: המשך שיחה קיימת מההיסטוריה (כשלוחצים כוכבית בשלוחה 2) ---
+# --- שלוחה 4: המשך שיחה קיימת מההיסטוריה (כשמקישים כוכבית בשלוחה 2 באמצע ההאזנה) ---
 @chat_bp.route('/api/continue_chat', methods=['GET', 'POST'])
 def continue_chat():
     try:
@@ -163,7 +164,7 @@ def continue_chat():
         if args.get('hangup') == 'yes': return ""
         if not phone or phone == 'unknown': return ""
         
-        # כניסה ראשונית לשלוחה 4 (מיד לאחר שהקיש כוכבית בשלוחה 2)
+        # כניסה ראשונית לשלוחה 4 (מיד לאחר לחיצה על כוכבית)
         if not user_audio:
             topic_id = download_ym_text(yemot_num, yemot_pass, f"2/{phone}_last_selected.txt")
             if not topic_id: topic_id = "1"
