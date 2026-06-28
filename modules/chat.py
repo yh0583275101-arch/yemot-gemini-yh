@@ -111,7 +111,7 @@ def process_chat_turn(phone, gemini_key, yemot_num, yemot_pass, user_audio, topi
         
     # אם זה נושא חדש לגמרי וזו השאלה הראשונה, נבקש מג'מיני כותרת ונעדכן את רשימת הנושאים האישית
     if is_new_topic and file_idx == 1:
-        title_res = model.generate_content(f"תן כותרת קצרה מנוקדת בת 2 עד 3 מילים עבור הטקסט הבא (ללא תווים מיוחדים): {answer_text}")
+        title_res = model.generate_content(f"""תן כותרת קצרה מנוקדת בת 2 עד 3 מילים עבור הטקסט הבא (ללא תווים מיוחדים) ואל תכתוב בתשובה שלך טקסט כגון "בטח הנה כותרת... אלא תתן ישר כותרת למשל מה זה תרופת פלצבו: {answer_text}""")
         title = title_res.text.strip()
         topics_path = f"2/{phone}_topics.txt"
         topics_text = download_ym_text(yemot_num, yemot_pass, topics_path)
